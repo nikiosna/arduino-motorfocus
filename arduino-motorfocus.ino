@@ -1,15 +1,18 @@
+//https://www.arduinolibraries.info/libraries/accel-stepper
+//http://www.hobby-werkstatt-blog.de/arduino/357-schrittmotor-28byj48-am-arduino.php
+
 #include <SoftwareSerial.h>
 #include <AccelStepper.h>
 #include <EEPROM.h>
 
-SoftwareSerial debugSerial(7, 8);
+SoftwareSerial debugSerial(6, 7);
 
 const int stepsPerRevolution = 32*64;  // change this to fit the number of steps per revolution
 const int maxSpeed = 10;
 const int maxCmd = 8;
 
 // initialize the stepper library on pins 8 through 11:
-AccelStepper stepper(AccelStepper::FULL4WIRE, 6, 4, 5, 3, false);
+AccelStepper stepper(AccelStepper::FULL4WIRE, 8, 9, 10, 11, false);
 
 // multiplier of SPEEDMUX, currently max speed is 480.
 int speedFactor = 16;
@@ -18,6 +21,7 @@ int speedMult = 30;
 
 long steps = 8;
 long currentPosition = 0;
+long currentPositionTemp = 0;
 long targetPosition = 0;
 long lastSavedPosition = 0;
 long millisLastMove = 0;
@@ -38,9 +42,16 @@ void setup() {
   stepper.setAcceleration(10);
   millisLastMove = millis();
     
-  // read saved position from EEPROM
-  //EEPROM.put(0, (long)0);
+  // read saved position from EEPROM (2 times for testing validity (better when the sketch on the board switches))
   EEPROM.get(0, currentPosition);
+  EEPROM.get(8, currentPositionTemp);
+  while(currentPosition != currentPositionTemp) {
+    debugSerial.print("EEPROM not valid resetting...");
+    EEPROM.put(0, (long)0);
+    EEPROM.put(8, (long)0);
+    EEPROM.get(0, currentPosition);
+    EEPROM.get(8, currentPositionTemp);
+  }
   stepper.setCurrentPosition(currentPosition);
   lastSavedPosition = currentPosition;
   debugSerial.print("Load last position from EEPROM...");
@@ -199,6 +210,7 @@ void loop() {
       // Save current location in EEPROM
       if (lastSavedPosition != currentPosition) {
         EEPROM.put(0, currentPosition);
+        EEPROM.put(8, currentPosition);
         lastSavedPosition = currentPosition;
         debugSerial.println("Save last position to EEPROM");
         stepper.disableOutputs();
