@@ -1,6 +1,9 @@
 //https://www.arduinolibraries.info/libraries/accel-stepper
 //http://www.hobby-werkstatt-blog.de/arduino/357-schrittmotor-28byj48-am-arduino.php
 
+//https://learn.adafruit.com/tmp36-temperature-sensor/overview
+#define tempsensor A1
+
 #include <SoftwareSerial.h>
 #include <AccelStepper.h>
 #include <EEPROM.h>
@@ -27,6 +30,10 @@ long lastSavedPosition = 0;
 long millisLastMove = 0;
 const long millisDisableDelay = 15000;
 bool isRunning = false;
+
+float temperature;
+float a = 1/2.05;   //Sensorvalue to Temperature TMP36
+float b = -50;
 
 // read commands
 bool eoc = false;
@@ -72,10 +79,10 @@ void loop() {
       param = line.substring(2);
     }
     
-    //debugSerial.print(cmd);
-    //debugSerial.print(":");
-    //debugSerial.println(param);
-    //debugSerial.println(line);
+    debugSerial.print(cmd);
+    debugSerial.print(":");
+    debugSerial.println(param);
+    debugSerial.println(line);
     line = "";
     eoc = false;
 
@@ -119,7 +126,11 @@ void loop() {
     }
     // get the current temperature, hard-coded
     if (cmd.equalsIgnoreCase("GT")) {
-      Serial.print("0020#");
+      temperature = (analogRead(tempsensor)/2.05)-50;
+      char tempString[6];
+      sprintf(tempString, "%04X", temperature);
+      Serial.print(tempString);
+      Serial.print("#");
     }
 
     // get the temperature coefficient, hard-coded
