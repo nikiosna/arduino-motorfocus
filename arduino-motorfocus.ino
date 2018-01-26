@@ -10,6 +10,12 @@
 
 SoftwareSerial debugSerial(6, 7);
 
+struct data{
+  long currentPosition;
+  int compensationvalue;
+  int isEEPROMinitialized;
+} data;
+
 const int stepsPerRevolution = 32*64;  // change this to fit the number of steps per revolution
 const int maxSpeed = 10;
 const int maxCmd = 8;
@@ -53,15 +59,16 @@ void setup() {
   millisLastMove = millis();
     
   // read saved position from EEPROM (2 times for testing validity (better when the sketch on the board switches))
-  EEPROM.get(0, currentPosition);
-  EEPROM.get(8, currentPositionTemp);
-  while(currentPosition != currentPositionTemp) {
+  EEPROM.get(0, data);
+  if(data.isEEPROMinitialized != 1) {
     debugSerial.print("EEPROM not valid resetting...");
-    EEPROM.put(0, (long)0);
-    EEPROM.put(8, (long)0);
-    EEPROM.get(0, currentPosition);
-    EEPROM.get(8, currentPositionTemp);
+    data.currentPosition = 0;
+    data.compensationvalue = 1;
+    data.isEEPROMinitialized = 1;
+    EEPROM.put(0, data);
   }
+  currentPosition = data.currentPosition;
+  
   stepper.setCurrentPosition(currentPosition);
   lastSavedPosition = currentPosition;
   debugSerial.print("Load last position from EEPROM...");
@@ -235,8 +242,8 @@ void loop() {
     if(millis() - millisLastMove > millisDisableDelay){
       // Save current location in EEPROM
       if (lastSavedPosition != currentPosition) {
-        EEPROM.put(0, currentPosition);
-        EEPROM.put(8, currentPosition);
+        data.currentPosition = currentPosition;
+        EEPROM.put(0, data);
         lastSavedPosition = currentPosition;
         debugSerial.println("Save last position to EEPROM");
         stepper.disableOutputs();
