@@ -126,9 +126,9 @@ void loop() {
     }
     // get the current temperature, hard-coded
     if (cmd.equalsIgnoreCase("GT")) {
-      temperature = (analogRead(tempsensor)/2.05)-50;
+      temperature = (analogRead(tempsensor)*a)+b;
       char tempString[6];
-      sprintf(tempString, "%04X", temperature);
+      sprintf(tempString, "%04X", (long)temperature);
       Serial.print(tempString);
       Serial.print("#");
     }
