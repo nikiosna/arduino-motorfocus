@@ -31,7 +31,10 @@ long millisLastMove = 0;
 const long millisDisableDelay = 15000;
 bool isRunning = false;
 
+boolean tempcompensation = false;
+int compensationvalue = 0; //TODO
 float temperature;
+float temperatureLast;
 float a = 1/2.05;   //Sensorvalue to Temperature TMP36
 float b = -50;
 
@@ -63,10 +66,14 @@ void setup() {
   lastSavedPosition = currentPosition;
   debugSerial.print("Load last position from EEPROM...");
   debugSerial.println(lastSavedPosition);
+
+  temperature = (analogRead(tempsensor)*a)+b;
+  temperatureLast = temperature;
 }
 
 void loop() {
- 
+  temperature = (analogRead(tempsensor)*a)+b;
+  
   // process the command we got
   if (eoc) {
     //Serial.println(line);
@@ -126,7 +133,6 @@ void loop() {
     }
     // get the current temperature, hard-coded
     if (cmd.equalsIgnoreCase("GT")) {
-      temperature = (analogRead(tempsensor)*a)+b;
       char tempString[6];
       sprintf(tempString, "%04X", (long)temperature);
       Serial.print(tempString);
@@ -202,6 +208,15 @@ void loop() {
       //stepper.run();
       //running = false;
       stepper.stop();
+    }
+  }
+
+  //calculate the distance to go for the temperature compensation
+  if (tempcompensation == true) {
+    float tempchange = temperatureLast - temperature;
+    if(tempchange >= 1) {
+      stepper.moveTo(targetPosition + tempchange*compensationvalue);
+      temperatureLast = temperature;
     }
   }
 
