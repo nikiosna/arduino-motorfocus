@@ -8,7 +8,7 @@
 #include <AccelStepper.h>
 #include <EEPROM.h>
 
-SoftwareSerial debugSerial(6, 7);
+SoftwareSerial debugSerial(7, 8);
 
 struct data{
   long currentPosition;
@@ -20,8 +20,8 @@ const int stepsPerRevolution = 32*64;  // change this to fit the number of steps
 const int maxSpeed = 10;
 const int maxCmd = 8;
 
-// initialize the stepper library on pins 8 through 11:
-AccelStepper stepper(AccelStepper::FULL4WIRE, 8, 9, 10, 11, false);
+// initialize the stepper library on pins 3 through 6:
+AccelStepper stepper(AccelStepper::FULL4WIRE, 6, 4, 5, 3, false);
 
 // multiplier of SPEEDMUX, currently max speed is 480.
 int speedFactor = 16;
