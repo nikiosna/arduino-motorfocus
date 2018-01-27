@@ -37,7 +37,7 @@ long millisLastMove = 0;
 const long millisDisableDelay = 15000;
 bool isRunning = false;
 
-boolean tempcompensation = false;
+boolean tempcompensation = true;
 int compensationvalue = 0; //TODO
 float temperature;
 float temperatureLast;
@@ -58,12 +58,13 @@ void setup() {
   stepper.setAcceleration(10);
   millisLastMove = millis();
     
-  // read saved position from EEPROM (2 times for testing validity (better when the sketch on the board switches))
+  // read data from EEPROM
+  debugSerial.print("Load last position from EEPROM...");
   EEPROM.get(0, data);
   if(data.isEEPROMinitialized != 1) {
     debugSerial.print("EEPROM not valid resetting...");
     data.currentPosition = 0;
-    data.compensationvalue = 1;
+    data.compensationvalue = 10;
     data.isEEPROMinitialized = 1;
     EEPROM.put(0, data);
   }
@@ -71,7 +72,6 @@ void setup() {
   
   stepper.setCurrentPosition(currentPosition);
   lastSavedPosition = currentPosition;
-  debugSerial.print("Load last position from EEPROM...");
   debugSerial.println(lastSavedPosition);
 
   temperature = (analogRead(tempsensor)*a)+b;
@@ -144,6 +144,11 @@ void loop() {
       sprintf(tempString, "%04X", (long)temperature);
       Serial.print(tempString);
       Serial.print("#");
+
+      debugSerial.print("Temperature is:");
+      debugSerial.print(temperature);
+      debugSerial.print("°C   ");
+      debugSerial.println(tempString);
     }
 
     // get the temperature coefficient, hard-coded
@@ -220,10 +225,16 @@ void loop() {
 
   //calculate the distance to go for the temperature compensation
   if (tempcompensation == true) {
-    float tempchange = temperatureLast - temperature;
-    if(tempchange >= 1) {
+    float tempchange = temperature - temperatureLast;
+    if(tempchange >= 1 || tempchange <= -1) {
+      debugSerial.print("Tempcorrection: current target ");
+      debugSerial.print(targetPosition);
+      
       stepper.moveTo(targetPosition + tempchange*compensationvalue);
       temperatureLast = temperature;
+      
+      debugSerial.print("new target ");
+      debugSerial.println(targetPosition);
     }
   }
 
