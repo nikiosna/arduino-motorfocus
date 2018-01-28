@@ -37,10 +37,13 @@ long millisLastMove = 0;
 const long millisDisableDelay = 15000;
 bool isRunning = false;
 
-boolean tempcompensation = false;
+boolean tempcompensation = true;
 long millsLastTempCompensation = 0;
-const long millisDisableTempCompensation = 2000;
+const long millisDisableTempCompensation = 10000;
+const int maxValues = 10; //build the avarege of the temperature
+int countValues = 0;
 int compensationvalue;
+float temperature_sum = 0;
 float temperature;
 float temperatureLast;
 float a = 1/2.05;   //Sensorvalue to Temperature TMP36
@@ -78,12 +81,27 @@ void setup() {
   lastSavedPosition = currentPosition;
   debugSerial.println(lastSavedPosition);
 
-  temperature = (analogRead(tempsensor)*a)+b;
+  //avarege of temperature
+  while(countValues < maxValues) {
+    temperature_sum += (analogRead(tempsensor)*a)+b;
+    countValues++;
+    delay(50);
+  }
+  temperature = temperature_sum / maxValues;
   temperatureLast = temperature;
+  temperature_sum = 0;
+  countValues = 0;
 }
 
 void loop() {
-  temperature = (analogRead(tempsensor)*a)+b;
+  if(countValues < maxValues) {
+    temperature_sum += (analogRead(tempsensor)*a)+b;
+    countValues++;
+  } else {
+    temperature = temperature_sum / maxValues;
+    temperature_sum = 0;
+    countValues = 0;
+  }
   
   // process the command we got
   if (eoc) {
@@ -150,7 +168,8 @@ void loop() {
       debugSerial.print("test SC:");
       debugSerial.print(param);
       debugSerial.print(" = ");
-      debugSerial.println(test*16);
+      debugSerial.println(test);
+      //TODO
     }
     
     // get the current motor speed, only values of 02, 04, 08, 10, 20
@@ -227,6 +246,7 @@ void loop() {
       debugSerial.print("   currentpos: ");
       debugSerial.println(stepper.currentPosition());
 
+      stepper.enableOutputs();
       stepper.moveTo(stepper.currentPosition() + tempchange*compensationvalue);
       
       temperatureLast = temperature;
