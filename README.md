@@ -1,11 +1,11 @@
 # arduino-motorfocus
 
 Simple moonlite focuser protocol implementation for Arduino and stepper motor.
-Temperature support for TMP36 sensor added. (WIP)
 
-Tested with Arduino Nano and cheap [28BYJ-48 stepper motor with driver](https://arduino-info.wikispaces.com/SmallSteppers) and [INDI / Ekos](http://indilib.org).
+rewritten with https://github.com/laurb9/StepperDriver
 
-![alt text](res/image01.jpg)
+Tested with Arduino Nano, DRV8825 Driver, NEMA17 17HS13-0404S-PG27 Stepper (https://arduino-info.wikispaces.com/SmallSteppers) and [INDI / Ekos](http://indilib.org).
 
-![alt text](res/image02.jpg)
+Mounting for GSO Newton in res2/
 
+![alt text](res2/mounting_GSO150-750.png)

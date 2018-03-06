@@ -1,108 +1,40 @@
-//https://www.arduinolibraries.info/libraries/accel-stepper
-//http://www.hobby-werkstatt-blog.de/arduino/357-schrittmotor-28byj48-am-arduino.php
-
-//https://learn.adafruit.com/tmp36-temperature-sensor/overview
-#define tempsensor A1
+//https://github.com/laurb9/StepperDriver
+//https://www.omc-stepperonline.com/geared-stepper-motor/nema-17-stepper-motor-bipolar-l33mm-w-gear-raio-271-planetary-gearbox-17hs13-0404s-pg27.html
 
 #include <SoftwareSerial.h>
-#include <AccelStepper.h>
 #include <EEPROM.h>
+#include "DRV8825.h"
 
-SoftwareSerial debugSerial(7, 8);
+#define RPM 2 //speed
+#define ENABLE 7
+#define DIR 5
+#define STEP 6
+#define MOTOR_STEPS 5370 //200*26.85
+DRV8825 stepper(MOTOR_STEPS, DIR, STEP, ENABLE);
 
-struct data{
-  long currentPosition;
-  int compensationvalue;
-  int isEEPROMinitialized;
-} data;
+int direction = 1; //switch this from 1 to -1 to inverse direction
 
-const int stepsPerRevolution = 32*64;  // change this to fit the number of steps per revolution
-const int maxSpeed = 10;
-const int maxCmd = 8;
-
-// initialize the stepper library on pins 3 through 6:
-AccelStepper stepper(AccelStepper::FULL4WIRE, 6, 4, 5, 3, false);
-
-// multiplier of SPEEDMUX, currently max speed is 480.
-int speedFactor = 16;
-int speedFactorRaw = 2;
-int speedMult = 30;
-
-long steps = 8;
 long currentPosition = 0;
-long currentPositionTemp = 0;
 long targetPosition = 0;
-long lastSavedPosition = 0;
-long millisLastMove = 0;
-const long millisDisableDelay = 15000;
-bool isRunning = false;
-
-boolean tempcompensation = true;
-long millsLastTempCompensation = 0;
-const long millisDisableTempCompensation = 10000;
-const int maxValues = 10; //build the avarege of the temperature
-int countValues = 0;
-int compensationvalue;
-float temperature_sum = 0;
-float temperature;
-float temperatureLast;
-float a = 1/2.05;   //Sensorvalue to Temperature TMP36
-float b = -50;
 
 // read commands
+const int maxCmd = 8;
 bool eoc = false;
 String line;
 
 void setup() {
   Serial.begin(9600);
-  debugSerial.begin(9600);
-
 
   // initalize motor
-  stepper.setMaxSpeed(speedFactor * speedMult);
-  stepper.setAcceleration(10);
-  millisLastMove = millis();
-    
-  // read data from EEPROM
-  debugSerial.print("Load last position from EEPROM...");
-  EEPROM.get(0, data);
-  if(data.isEEPROMinitialized != 1) {
-    debugSerial.print("EEPROM not valid resetting...");
-    data.currentPosition = 0;
-    data.compensationvalue = 1;
-    data.isEEPROMinitialized = 1;
-    EEPROM.put(0, data);
-    EEPROM.get(0, data);
-  }
-  currentPosition = data.currentPosition;
-  compensationvalue = data.compensationvalue;
+  stepper.begin(RPM, 2);
+  stepper.enable();
   
-  stepper.setCurrentPosition(currentPosition);
-  lastSavedPosition = currentPosition;
-  debugSerial.println(lastSavedPosition);
-
-  //avarege of temperature
-  while(countValues < maxValues) {
-    temperature_sum += (analogRead(tempsensor)*a)+b;
-    countValues++;
-    delay(50);
-  }
-  temperature = temperature_sum / maxValues;
-  temperatureLast = temperature;
-  temperature_sum = 0;
-  countValues = 0;
+  currentPosition = 10000; 
+  targetPosition = currentPosition;
 }
 
 void loop() {
-  if(countValues < maxValues) {
-    temperature_sum += (analogRead(tempsensor)*a)+b;
-    countValues++;
-  } else {
-    temperature = temperature_sum / maxValues;
-    temperature_sum = 0;
-    countValues = 0;
-  }
-  
+
   // process the command we got
   if (eoc) {
     String cmd, param;
@@ -123,9 +55,7 @@ void loop() {
     }
     // home the motor, hard-coded, ignore parameters since we only have one motor
     else if (cmd.equalsIgnoreCase("PH")) { 
-      stepper.setCurrentPosition(8000);
-      stepper.moveTo(0);
-      isRunning = true;
+      targetPosition = -1*currentPosition;
     }
     // firmware value, always return "10"
     if (cmd.equalsIgnoreCase("GV")) {
@@ -133,7 +63,6 @@ void loop() {
     }
     // get the current motor position
     else if (cmd.equalsIgnoreCase("GP")) {
-      currentPosition = stepper.currentPosition();
       char tempString[6];
       sprintf(tempString, "%04X", currentPosition);
       Serial.print(tempString);
@@ -149,54 +78,35 @@ void loop() {
     // get the current temperature, hard-coded
     else if (cmd.equalsIgnoreCase("GT")) {
       char tempString[6];
-      sprintf(tempString, "%04X", (long)temperature);
+      sprintf(tempString, "%04X", 20.0);
       Serial.print(tempString);
       Serial.print("#");
     }
-
     // get the temperature coefficient
     else if (cmd.equalsIgnoreCase("GC")) {
       char tempString[6];
-      sprintf(tempString, "%02X", (long)compensationvalue);
+      sprintf(tempString, "%02X", 20.0);
       Serial.print(tempString);
       Serial.print("#");
     }
-
     // set the temperature coefficient
     else if (cmd.equalsIgnoreCase("SC")) {
       long test = hexstr2long(param);
-      debugSerial.print("test SC:");
-      debugSerial.print(param);
-      debugSerial.print(" = ");
-      debugSerial.println(test);
       //TODO
     }
-    
     // get the current motor speed, only values of 02, 04, 08, 10, 20
     else if (cmd.equalsIgnoreCase("GD")) {
       char tempString[6];
-      sprintf(tempString, "%02X", speedFactorRaw);
-      Serial.print(tempString);
-      Serial.print("#");
-
-      debugSerial.print("current motor speed: ");
-      debugSerial.println(tempString);
+      //TODO
     }
-    
     // set speed, only acceptable values are 02, 04, 08, 10, 20
     else if (cmd.equalsIgnoreCase("SD")) {
-      speedFactorRaw = hexstr2long(param);
-
-      // SpeedFactor: smaller value means faster
-      speedFactor = 32 / speedFactorRaw;
-      stepper.setMaxSpeed(speedFactor * speedMult);
+      //TODO
     }
-    
     // whether half-step is enabled or not, always return "00"
     else if (cmd.equalsIgnoreCase("GH")) {
       Serial.print("00#");
     }
-    
     // motor is moving - 01 if moving, 00 otherwise
     else if (cmd.equalsIgnoreCase("GI")) {
       if(abs(targetPosition - currentPosition) > 0){
@@ -208,79 +118,32 @@ void loop() {
     // set current motor position
     else if (cmd.equalsIgnoreCase("SP")) {
       currentPosition = hexstr2long(param) * 16;
-      stepper.setCurrentPosition(currentPosition);      
     }
     // set new motor position
     else if (cmd.equalsIgnoreCase("SN")) {
-      debugSerial.print("new target position ");
-      debugSerial.print(targetPosition);
-      debugSerial.print(" -> ");
       targetPosition = hexstr2long(param) * 16;
-      debugSerial.println(targetPosition);
     }
     // initiate a move
     else if (cmd.equalsIgnoreCase("FG")) {
-      stepper.enableOutputs();
-      stepper.moveTo(targetPosition);
+      stepper.enable();
+      stepper.move((currentPosition - targetPosition)*direction);
+      currentPosition = targetPosition;
     }
     // stop a move
     else if (cmd.equalsIgnoreCase("FQ")) {
-      stepper.stop();
+      stepper.disable();
     }
     else if (cmd.equals("")){;}
     //unknown command
     else {
-      debugSerial.print(cmd);
-      debugSerial.print(":");
-      debugSerial.println(param);
-      debugSerial.println(line);
     }
   }
 
-  //calculate the distance to go for the temperature compensation
-  if (tempcompensation == true && (millis() - millsLastTempCompensation) > millisDisableTempCompensation) {
-    float tempchange = temperature - temperatureLast;
-    if(abs(tempchange) >= 1) {
-      debugSerial.print("tempchange: ");
-      debugSerial.print(tempchange);
-      debugSerial.print("   currentpos: ");
-      debugSerial.println(stepper.currentPosition());
-
-      stepper.enableOutputs();
-      stepper.moveTo(stepper.currentPosition() + tempchange*compensationvalue);
-      
-      temperatureLast = temperature;
-      millsLastTempCompensation = millis();
-    }
-  }
-
-  // move motor if not done
-  if (stepper.distanceToGo() != 0) {    
-    isRunning = true;
-    millisLastMove = millis();
-    stepper.run();
-  }
-  else {
-    if (isRunning) {
-      isRunning = false;
-      //update current position when stopped
-      currentPosition = stepper.currentPosition();
-    }
-    if(millis() - millisLastMove > millisDisableDelay){
-      // Save current location in EEPROM
-      if (lastSavedPosition != currentPosition) {
-        data.currentPosition = currentPosition;
-        EEPROM.put(0, data);
-        lastSavedPosition = currentPosition;
-        debugSerial.println("Save last position to EEPROM");
-        stepper.disableOutputs();
-        debugSerial.println("Disabled output pins");
-      }
-    }
-  }
+  //...
+  
 }
 
-void serialEvent () {
+void serialEvent() {
   // read the command until the terminating # character
   while (Serial.available() && !eoc) {
     char c = Serial.read();
