@@ -14,3 +14,6 @@ TODO: Edit the mounting to fit the bigger stepper
 Currently I improvised the bigger stepper on the old mounting because I don't want to reprint it.
 ![alt text](res2/image2.jpg)
 ![alt text](res2/image3.jpg)
+
+I use a XL6009 DC-DC StepUp converter to supply the focuser only via the 5V usb wire.
+![alt text](res2/image4.jpg)
